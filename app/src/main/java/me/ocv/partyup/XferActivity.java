@@ -123,9 +123,18 @@ public class XferActivity extends AppCompatActivity {
                 "Basic " + new String(Base64.getEncoder().encode(password.getBytes()));
 
         final FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
+        final FloatingActionButton enqueueButton = (FloatingActionButton) findViewById(R.id.enqueueButton);
+
         fab.setOnClickListener(v -> {
             fab.setVisibility(View.GONE);
-            do_up();
+            enqueueButton.setVisibility(View.GONE);
+            do_up(false);
+        });
+
+        enqueueButton.setOnClickListener(v -> {
+            fab.setVisibility(View.GONE);
+            enqueueButton.setVisibility(View.GONE);
+            do_up(true);
         });
     }
 
@@ -213,7 +222,7 @@ public class XferActivity extends AppCompatActivity {
     private void handleSendText() {
         show_msg("Post the following link?\n\n" + the_msg);
         if (prefs.getBoolean("autosend", false))
-            do_up();
+            do_up(false);
     }
 
     @SuppressLint("DefaultLocale")
@@ -299,18 +308,20 @@ public class XferActivity extends AppCompatActivity {
         }
         show_msg(msg);
         if (prefs.getBoolean("autosend", false))
-            do_up();
+            do_up(false);
     }
 
-    private void do_up() {
+    private void do_up(boolean shouldEnqueue) {
         if (upping)
             return;
 
         upping = true;
-        new Thread(this::do_up2).start();
+        new Thread(() -> {
+            do_up2(shouldEnqueue);
+        }).start();
     }
 
-    private void do_up2() {
+    private void do_up2(boolean shouldEnqueue) {
         try {
             base_url = prefs.getString("server_url", "");
             if (base_url == null)
@@ -342,7 +353,7 @@ public class XferActivity extends AppCompatActivity {
                     conn.setRequestProperty("Authorization", password);
 
                 if (files == null)
-                    do_textmsg(conn);
+                    do_textmsg(conn, shouldEnqueue);
                 else if (!do_fileput(conn, a))
                     return;
             }
@@ -362,8 +373,8 @@ public class XferActivity extends AppCompatActivity {
         }
     }
 
-    private void do_textmsg(HttpURLConnection conn) throws Exception {
-        byte[] body = ("msg=" + URLEncoder.encode(the_msg, "UTF-8")).getBytes(StandardCharsets.UTF_8);
+    private void do_textmsg(HttpURLConnection conn, boolean shouldEnqueue) throws Exception {
+        byte[] body = ("msg=" + URLEncoder.encode(the_msg, "UTF-8") + (shouldEnqueue ? " enqueue" : "")).getBytes(StandardCharsets.UTF_8);
         conn.setRequestMethod("POST");
         conn.setFixedLengthStreamingMode(body.length);
         conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded;charset=UTF-8");
